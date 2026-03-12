@@ -122,3 +122,46 @@ The project can be assigned at different levels:
 - **advanced PDE/control**: discuss stabilizability and symmetry,
 - **computational project**: compare point actuation and patch actuation,
   animate the membrane, and scan actuator locations.
+
+## Repository structure
+.
+├── handout
+│   ├── handout.aux
+│   ├── handout.log
+│   ├── handout.out
+│   ├── handout.pdf
+│   └── handout.tex
+├── outputs
+│   ├── control.png
+│   ├── energy.png
+│   ├── membrane.gif
+│   ├── snapshot_t_0.00.png
+│   ├── snapshot_t_0.51.png
+│   ├── snapshot_t_1.50.png
+│   ├── snapshot_t_2.99.png
+│   └── snapshot_t_6.00.png
+├── PROJECT_TASKS.md
+├── README.md
+├── requirements.txt
+├── src
+│   └── python
+│       ├── __init__.py
+│       ├── modal_lqr.py
+│       ├── __pycache__
+│       │   ├── __init__.cpython-313.pyc
+│       │   ├── modal_lqr.cpython-313.pyc
+│       │   ├── run_demo.cpython-313.pyc
+│       │   └── scan_actuator.cpython-313.pyc
+│       ├── run_demo.py
+│       └── scan_actuator.py
+└── tests
+    ├── conftest.py
+    ├── __pycache__
+    │   ├── conftest.cpython-313-pytest-8.3.5.pyc
+    │   ├── conftest.cpython-313-pytest-9.0.2.pyc
+    │   ├── test_coupling.cpython-313-pytest-8.3.5.pyc
+    │   ├── test_coupling.cpython-313-pytest-9.0.2.pyc
+    │   ├── test_reconstruction.cpython-313-pytest-8.3.5.pyc
+    │   └── test_reconstruction.cpython-313-pytest-9.0.2.pyc
+    ├── test_coupling.py
+    └── test_reconstruction.py
