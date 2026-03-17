@@ -48,7 +48,7 @@ def point_coupling(m: int, n: int, x0: float, y0: float) -> float:
 
 
 def gaussian_patch(x: np.ndarray, y: np.ndarray, x0: float, y0: float, sigma: float) -> np.ndarray:
-    g = np.exp(-((x - x0) ** 2 + (y - y0) ** 2) / (2.0 * np.pi * sigma**2))
+    g = np.exp(-((x - x0) ** 2 + (y - y0) ** 2) / (2.0 * sigma**2))
     area = np.trapz(np.trapz(g, x=y[0, :], axis=1), x=x[:, 0], axis=0)
     return g / area
 
