@@ -12,8 +12,7 @@ from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
 
 import numpy as np
-from scipy.integrate import solve_ivp
-from scipy.linalg import solve_continuous_are
+from .student import solve_ivp, solve_continuous_are
 
 Mode = Tuple[int, int]
 
