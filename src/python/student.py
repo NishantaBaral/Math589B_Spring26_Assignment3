@@ -2,40 +2,18 @@ import numpy as np
 from dataclasses import dataclass
 from typing import List, Tuple
 
-Mode = Tuple[int, int]
 
-@dataclass
 class MembraneModel:
-    c: float
-    M: int
-    x0: float
-    y0: float
-    modes: List[Mode]
-    omegas_sq: np.ndarray
-    beta: np.ndarray
-    A: np.ndarray
-    B: np.ndarray
-
-def build_modes(M: int) -> List[Mode]:
-    return [(m, n) for m in range(1, M + 1) for n in range(1, M + 1)]
-
-def square_eigenfunction(m: int, n: int, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-    return 2.0 * np.sin(m * np.pi * x) * np.sin(n * np.pi * y)
-
-def square_eigenvalue(m: int, n: int) -> float:
-    return np.pi**2 * (m * m + n * n)
-
-def point_coupling(m: int, n: int, x0: float, y0: float) -> float:
-    return float(square_eigenfunction(m, n, np.array(x0), np.array(y0)))
-
-def patch_coupling(m: int, n: int, x0: float, y0: float, sigma: float = 0.06, ng: int = 121) -> float:
-    grid = np.linspace(0.0, 1.0, ng)
-    X, Y = np.meshgrid(grid, grid, indexing="ij")
-    g = np.exp(-((X - x0) ** 2 + (Y - y0) ** 2) / (2.0 * sigma**2))
-    area = np.trapz(np.trapz(g, x=grid, axis=1), x=grid, axis=0)
-    psi = g / area
-    phi = square_eigenfunction(m, n, X, Y)
-    return float(np.trapz(np.trapz(psi * phi, x=grid, axis=1), x=grid))
+    def __init__(self, c, M, x0, y0, modes, omegas_sq, beta, A, B):
+        self.c = c
+        self.M = M
+        self.x0 = x0
+        self.y0 = y0
+        self.modes = modes
+        self.omegas_sq = omegas_sq
+        self.beta = beta
+        self.A = A
+        self.B = B
 
 # writing our own versions of these functions to avoid scipy dependency
 #here we are implenting the continuous algebraic riccati equation solver but we are using direct method
@@ -73,14 +51,32 @@ def solve_ivp(fun, t_span, y0, t_eval=None, **kwargs):
 
 # == Model construction and LQR design ==. copied from modal_lqr.py but with some edits to make it work without scipy dependency
 def build_model(M=6, c=1.0, x0=0.37, y0=0.61, actuator="point", sigma=0.06, gamma=0.0):
-    modes = build_modes(M); N = len(modes)
-    omegas_sq = c**2 * np.array([square_eigenvalue(m, n) for m, n in modes])
+    modes = [(m, n) for m in range(1, M + 1) for n in range(1, M + 1)]
+    N = len(modes)
+    
+    # Eigenvalues and frequencies
+    lams = np.array([np.pi**2 * (m*m + n*n) for m, n in modes])
+    omegas_sq = (c**2) * lams
+
+    # Coupling logic
     if actuator == "point":
-        beta = np.array([point_coupling(m, n, x0, y0) for m, n in modes])
+        beta = np.array([2.0 * np.sin(m * np.pi * x0) * np.sin(n * np.pi * y0) for m, n in modes])
     else:
-        beta = np.array([patch_coupling(m, n, x0, y0, sigma) for m, n in modes])
+        # Simple trapezoidal integration for patch coupling
+        grid = np.linspace(0.0, 1.0, 101)
+        X, Y = np.meshgrid(grid, grid, indexing="ij")
+        g = np.exp(-((X - x0)**2 + (Y - y0)**2) / (2.0 * sigma**2))
+        psi = g / np.trapz(np.trapz(g, x=grid, axis=1), x=grid)
+        beta = []
+        for m, n in modes:
+            phi = 2.0 * np.sin(m * np.pi * X) * np.sin(n * np.pi * Y)
+            beta.append(np.trapz(np.trapz(psi * phi, x=grid, axis=1), x=grid))
+        beta = np.array(beta)
+
+    # State Space A and B
     A = np.block([[np.zeros((N, N)), np.eye(N)], [-np.diag(omegas_sq), -gamma * np.eye(N)]])
     B = np.vstack([np.zeros((N, 1)), beta.reshape(N, 1)])
+    
     return MembraneModel(c, M, x0, y0, modes, omegas_sq, beta, A, B)
 
 def build_lqr(model, alpha=1.0, beta_v=1.0, R=5e-2):
