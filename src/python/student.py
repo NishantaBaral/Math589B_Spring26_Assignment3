@@ -2,7 +2,6 @@ import numpy as np
 from dataclasses import dataclass
 from typing import List, Tuple
 
-
 class MembraneModel:
     def __init__(self, c, M, x0, y0, modes, omegas_sq, beta, A, B):
         self.c = c
@@ -24,6 +23,11 @@ def solve_continuous_are(A, B, Q, R):
     H = np.block([[A, -B @ R_inv @ B.T], [-Q, -A.T]])
     eigvals, eigvecs = np.linalg.eig(H)
     stable_indices = np.where(eigvals.real < -1e-10)[0]
+    
+    # Safety: if numerical precision is tight for M=16, we take the n most stable
+    if len(stable_indices) != n:
+        stable_indices = np.argsort(eigvals.real)[:n]
+        
     V = eigvecs[:, stable_indices]
     V1, V2 = V[:n, :], V[n:, :]
     P = (V2 @ np.linalg.inv(V1)).real
@@ -37,16 +41,32 @@ class OdeResult:
         self.t = t; self.y = y
 
 def solve_ivp(fun, t_span, y0, t_eval=None, **kwargs):
-    if t_eval is None: t_eval = np.linspace(t_span[0], t_span[1], 5000)
+    if t_eval is None: t_eval = np.linspace(t_span[0], t_span[1], 800)
     y = np.zeros((len(y0), len(t_eval))); y[:, 0] = y0
+    
+    # Substepping: we take 10 small steps between each point in t_eval 
+    # to make sure the M=16 high frequency waves don't leak energy
+    nsub = 10 
+
     for i in range(1, len(t_eval)):
-        dt = t_eval[i] - t_eval[i-1]
-        t = t_eval[i-1]; yc = y[:, i-1]
-        k1 = fun(t, yc)
-        k2 = fun(t + dt/2, yc + dt/2 * k1)
-        k3 = fun(t + dt/2, yc + dt/2 * k2)
-        k4 = fun(t + dt, yc + dt * k3)
-        y[:, i] = yc + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
+        t_start = t_eval[i-1]
+        t_end = t_eval[i]
+        h_total = t_end - t_start
+        h = h_total / nsub
+        
+        y_curr = y[:, i-1].copy()
+        t = t_start
+        
+        for _ in range(nsub):
+            k1 = np.array(fun(t, y_curr), dtype=float)
+            k2 = np.array(fun(t + 0.5 * h, y_curr + 0.5 * h * k1), dtype=float)
+            k3 = np.array(fun(t + 0.5 * h, y_curr + 0.5 * h * k2), dtype=float)
+            k4 = np.array(fun(t + h, y_curr + h * k3), dtype=float)
+            y_curr += (h / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
+            t += h
+            
+        y[:, i] = y_curr
+        
     return OdeResult(t_eval, y)
 
 # == Model construction and LQR design ==. copied from modal_lqr.py but with some edits to make it work without scipy dependency
@@ -90,8 +110,7 @@ def build_lqr(model, alpha=1.0, beta_v=1.0, R=5e-2):
 # == Simulation functions ==. again, we are writing our own versions of these to avoid scipy dependency
 #in open loop we just solve the homogeneous system x' = Ax, and in closed loop we solve x' = (A - BK)x
 def simulate_open_loop(model, x_init, T=6.0, nt=800):
-    actual_nt = 6000 if model.M > 10 else 1000
-    sol = solve_ivp(lambda t, x: model.A @ x, (0.0, T), x_init, np.linspace(0, T, actual_nt))
+    sol = solve_ivp(lambda t, x: model.A @ x, (0.0, T), x_init, np.linspace(0, T, nt))
     return sol.t, sol.y
 
 def simulate_closed_loop(model, K, x_init, T=6.0, nt=800):
@@ -100,4 +119,5 @@ def simulate_closed_loop(model, K, x_init, T=6.0, nt=800):
         return model.A @ x + model.B[:, 0] * u
     sol = solve_ivp(rhs, (0.0, T), x_init, np.linspace(0, T, nt))
     u_vals = np.array([-(K @ sol.y[:, i]).item() for i in range(sol.y.shape[1])])
+    return sol.t, sol.y, u_vals
     return sol.t, sol.y, u_vals
