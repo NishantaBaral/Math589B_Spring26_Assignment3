@@ -394,5 +394,64 @@ this optional extension.  Autograder will call your
 \texttt{build\_model}. Of course, you must adapt other functions that
 use the model, so that they properly handle the new parameter.
 
+\section*{Quick Reference: State-Space Matrices and Physical Meaning}
+The LQR controller translates the physical vibrations of the membrane into a system of interconnected matrices. Below is a summary of the core matrices you will build and manipulate in this project.
+
+\begin{table}[h]
+\centering
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{|c|c|p{4.5cm}|p{6cm}|}
+\hline
+\textbf{Matrix} & \textbf{Dimensions} & \textbf{Mathematical Role} & \textbf{Physical Meaning} \\ \hline
+$x$ & $2N \times 1$ & State Vector & The current position ($q$) and velocity ($p$) of all $N$ retained vibration modes. \\ \hline
+$A$ & $2N \times 2N$ & System Dynamics & Describes how the membrane vibrates naturally. It holds the “springiness" or restoring frequencies ($\omega^2$) of the drumhead. \\ \hline
+$B$ & $2N \times 1$ & Input Coupling & The leverage ($\beta_{mn}$) your actuator has over each mode. A value of $0$ means your finger is pressing on a “node" and cannot stop that specific ripple. \\ \hline
+$Q$ & $2N \times 2N$ & State Penalty Cost & How much you “hate" vibration. It heavily penalizes the membrane for having kinetic energy (moving fast) or potential energy (stretching). \\ \hline
+$R$ & $1 \times 1$ (Scalar) & Control Penalty Cost & How much you “hate" using force. A small $R$ means force is cheap (stop it instantly); a large $R$ means be gentle. \\ \hline
+$P$ & $2N \times 2N$ & Riccati Solution & The optimal “Cost-to-Go" energy map. You will solve for this using the Hamiltonian Matrix (Direct Method). \\ \hline
+$K$ & $1 \times 2N$ & Feedback Gain & The “cheat sheet." Multiplied by the state ($b = -Kx$), it tells the actuator exactly how hard to press at any given microsecond. \\ \hline
+\end{tabular}
+\vspace{0.2cm}
+\end{table}
+
+\subsection{The Direct Method (Hamiltonian Approach)}
+Because the Algebraic Riccati Equation \eqref{eq:ARE} is quadratic in $P$, it cannot be solved using standard linear matrix inversion. Instead of relying on iterative black-box solvers like \texttt{scipy.linalg.solve\_continuous\_are}, you will implement the \textbf{Direct Method}, which extracts $P$ directly from the eigenstructure of the system.
+
+You must implement the following four steps in your \texttt{solve\_continuous\_are} function:
+
+\begin{enumerate}[label=\textbf{Step \arabic*:}, leftmargin=4em]
+    \item \textbf{Construct the Hamiltonian Matrix ($H$)}\\
+    Build the $4N \times 4N$ block matrix $H$ using your state and penalty matrices:
+    \begin{equation}
+    \label{eq:hamiltonian}
+    H = 
+    \begin{bmatrix}
+    A & -B R^{-1} B^T \\
+    -Q & -A^T
+    \end{bmatrix}.
+    \end{equation}
+    
+    \item \textbf{Compute the Eigendecomposition}\\
+    Calculate all $4N$ eigenvalues and their corresponding eigenvectors for the matrix $H$. Because $H$ is a Hamiltonian matrix, its eigenvalues are symmetric about the imaginary axis (if $\lambda$ is an eigenvalue, so is $-\lambda$).
+    
+    \item \textbf{Isolate the Stable Subspace}\\
+    Identify the $2N$ eigenvalues that have strictly \textbf{negative real parts} ($\operatorname{Re}(\lambda) < 0$). These represent the stable dynamics of the system. Collect their corresponding $2N$ eigenvectors and arrange them as columns to form a $4N \times 2N$ matrix $V$.
+    
+    \item \textbf{Partition and Solve for $P$}\\
+    Split the matrix $V$ horizontally into two $2N \times 2N$ square blocks, $V_1$ (the top half) and $V_2$ (the bottom half):
+    \begin{equation}
+    \label{eq:V_partition}
+    V = \begin{bmatrix} V_1 \\ V_2 \end{bmatrix}.
+    \end{equation}
+    The unique, positive semi-definite solution to the Riccati equation is then given by:
+    \begin{equation}
+    \label{eq:P_solution}
+    P = V_2 V_1^{-1}.
+    \end{equation}
+\end{enumerate}
+
+\begin{remark}
+Once $P$ is found via \eqref{eq:P_solution}, you can immediately compute the LQR feedback gain $K = R^{-1}B^T P$ for your closed-loop simulation. If $V_1$ is not invertible, it typically implies the system is not stabilizable with the chosen actuator location (e.g., placing the actuator precisely on a node).
+\end{remark}
 
 \end{document}
