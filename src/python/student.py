@@ -37,7 +37,7 @@ class OdeResult:
         self.t = t; self.y = y
 
 def solve_ivp(fun, t_span, y0, t_eval=None, **kwargs):
-    if t_eval is None: t_eval = np.linspace(t_span[0], t_span[1], 100)
+    if t_eval is None: t_eval = np.linspace(t_span[0], t_span[1], 5000)
     y = np.zeros((len(y0), len(t_eval))); y[:, 0] = y0
     for i in range(1, len(t_eval)):
         dt = t_eval[i] - t_eval[i-1]
