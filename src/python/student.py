@@ -154,22 +154,3 @@ def build_lqr(model: MembraneModel, alpha: float = 1.0, beta_v: float = 1.0, R: 
     K = np.linalg.solve(Rmat, model.B.T @ P)
     
     return Q, Rmat, P, K
-#Th monkey patching below is necessary to ensure that the autograder uses our custom implementations instead of the original Scipy functions, 
-# which would cause it to fail. By overriding these functions in the modal_lqr module,
-#  we can ensure that all calls to solve_continuous_are and solve_ivp within the autograder will use our versions, 
-# allowing us to pass the tests successfully. Additionally, we patch build_lqr to ensure it uses our solver during testing.
-# Overrides the original module's Scipy functions to prevent autograder failure
-
-# A. Patch the built-in Scipy libraries directly! 
-import scipy.linalg
-import scipy.integrate
-scipy.linalg.solve_continuous_are = solve_continuous_are
-scipy.integrate.solve_ivp = solve_ivp
-
-# B. Patch the original module to redirect any internal calls
-modal_lqr.solve_continuous_are = solve_continuous_are
-modal_lqr.solve_ivp = solve_ivp
-modal_lqr.build_model = build_model
-modal_lqr.build_lqr = build_lqr
-modal_lqr.simulate_open_loop = simulate_open_loop
-modal_lqr.simulate_closed_loop = simulate_closed_loop
