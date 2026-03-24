@@ -69,6 +69,8 @@ def build_model(
     y0: float = 0.61,
     actuator: str = "point",
     sigma: float = 0.06,
+    gamma: float = 0.0,
+
 ) -> MembraneModel:
     modes = build_modes(M)
     N = len(modes)
