@@ -89,8 +89,9 @@ def build_lqr(model, alpha=1.0, beta_v=1.0, R=5e-2):
 
 # == Simulation functions ==. again, we are writing our own versions of these to avoid scipy dependency
 #in open loop we just solve the homogeneous system x' = Ax, and in closed loop we solve x' = (A - BK)x
-def simulate_open_loop(model, x_init, T=6.0, nt=2000):
-    sol = solve_ivp(lambda t, x: model.A @ x, (0.0, T), x_init, np.linspace(0, T, nt))
+def simulate_open_loop(model, x_init, T=6.0, nt=800):
+    actual_nt = 6000 if model.M > 10 else 1000
+    sol = solve_ivp(lambda t, x: model.A @ x, (0.0, T), x_init, np.linspace(0, T, actual_nt))
     return sol.t, sol.y
 
 def simulate_closed_loop(model, K, x_init, T=6.0, nt=800):
